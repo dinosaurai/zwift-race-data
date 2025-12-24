@@ -1,0 +1,17 @@
+.chart-section {
+  padding: 40px 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.chart-section h2 {
+  color: #333;
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+.chart-description {
+  color: #666;
+  font-size: 1rem;
+  margin-bottom: 20px;
+}
