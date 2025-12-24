@@ -136,12 +136,12 @@ export class ZwiftRaceScraper {
             console.warn('Login may have failed - no authentication cookies found');
             return null;
         } catch (error) {
-            // Security: Log error details without exposing sensitive information
+            // Security: Log minimal error details without exposing sensitive information
             console.error('Login error: Authentication request failed');
             if (axios.isAxiosError(error)) {
+                // Only log status code and error code, not statusText which could contain sensitive info
                 console.error('Error details:', {
                     status: error.response?.status,
-                    statusText: error.response?.statusText,
                     code: error.code,
                 });
             }

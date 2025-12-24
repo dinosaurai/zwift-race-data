@@ -35,6 +35,7 @@ app.use(cors({
 app.use(express.json());
 
 // Security: Configure logging to skip sensitive routes
+// Note: Placed after JSON parsing to ensure proper request body handling
 app.use(morgan('combined', {
     skip: (req, res) => {
         // Skip logging for login endpoint to prevent credential exposure
@@ -55,6 +56,12 @@ app.post('/api/login', async (req, res) => {
     // Security: Extract credentials and implement "hot potato" pattern
     let username: string | undefined;
     let password: string | undefined;
+    
+    // Helper function to nullify credentials
+    const clearCredentials = () => {
+        username = undefined;
+        password = undefined;
+    };
     
     try {
         // Extract credentials from request body
@@ -89,8 +96,7 @@ app.post('/api/login', async (req, res) => {
         const cookies = await loginScraper.login(username, password);
         
         // Security: Nullify credentials immediately after use ("hot potato" pattern)
-        username = undefined;
-        password = undefined;
+        clearCredentials();
         
         if (cookies) {
             res.json({ 
@@ -107,8 +113,7 @@ app.post('/api/login', async (req, res) => {
         }
     } catch (error) {
         // Security: Ensure credentials are nullified even on error
-        username = undefined;
-        password = undefined;
+        clearCredentials();
         
         // Security: Log error without exposing sensitive data
         console.error('Error during login: Authentication failed');
