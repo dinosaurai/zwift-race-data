@@ -35,10 +35,16 @@ app.post('/api/login', async (req, res) => {
             });
         }
 
-        const success = await scraper.login(username, password);
+        // Create a new scraper instance for this login
+        const loginScraper = new ZwiftRaceScraper();
+        const cookies = await loginScraper.login(username, password);
         
-        if (success) {
-            res.json({ success: true, message: 'Login successful' });
+        if (cookies) {
+            res.json({ 
+                success: true, 
+                message: 'Login successful',
+                cookies: cookies
+            });
         } else {
             res.status(401).json({ 
                 success: false,
@@ -59,7 +65,10 @@ app.post('/api/login', async (req, res) => {
 app.get('/api/race/:raceId/riders', async (req, res) => {
     try {
         const { raceId } = req.params;
-        const riders = await scraper.getRidersInRace(raceId);
+        const cookies = req.headers['x-zwift-cookies'] 
+            ? JSON.parse(req.headers['x-zwift-cookies'] as string) 
+            : undefined;
+        const riders = await scraper.getRidersInRace(raceId, cookies);
         res.json({ riders });
     } catch (error) {
         console.error('Error fetching riders:', error);
@@ -74,7 +83,10 @@ app.get('/api/race/:raceId/riders', async (req, res) => {
 app.get('/api/rider/:zwiftId/activities', async (req, res) => {
     try {
         const { zwiftId } = req.params;
-        const activities = await scraper.getPublicActivities(zwiftId);
+        const cookies = req.headers['x-zwift-cookies'] 
+            ? JSON.parse(req.headers['x-zwift-cookies'] as string) 
+            : undefined;
+        const activities = await scraper.getPublicActivities(zwiftId, cookies);
         res.json({ activities });
     } catch (error) {
         console.error('Error fetching activities:', error);
@@ -89,7 +101,10 @@ app.get('/api/rider/:zwiftId/activities', async (req, res) => {
 app.get('/api/activity/:activityId/fit', async (req, res) => {
     try {
         const { activityId } = req.params;
-        const data = await scraper.downloadFit(activityId);
+        const cookies = req.headers['x-zwift-cookies'] 
+            ? JSON.parse(req.headers['x-zwift-cookies'] as string) 
+            : undefined;
+        const data = await scraper.downloadFit(activityId, cookies);
         
         if (!data) {
             return res.status(404).json({ error: 'FIT file not found or not accessible' });
@@ -111,7 +126,10 @@ app.get('/api/activity/:activityId/fit', async (req, res) => {
 app.get('/api/race/:raceId/fit-files', async (req, res) => {
     try {
         const { raceId } = req.params;
-        const fitFiles = await scraper.pullRaceFitFiles(raceId);
+        const cookies = req.headers['x-zwift-cookies'] 
+            ? JSON.parse(req.headers['x-zwift-cookies'] as string) 
+            : undefined;
+        const fitFiles = await scraper.pullRaceFitFiles(raceId, cookies);
         
         // Convert ArrayBuffers to Base64 for JSON transmission
         const serializedFiles = fitFiles.map(file => ({

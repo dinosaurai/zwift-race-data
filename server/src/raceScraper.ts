@@ -30,10 +30,9 @@ export class ZwiftRaceScraper {
 
     /**
      * Login to ZwiftPower using username and password
-     * This will authenticate with Zwift and set the necessary cookies
-     * for subsequent requests to ZwiftPower
+     * Returns cookies that can be used for subsequent authenticated requests
      */
-    public async login(username: string, password: string): Promise<boolean> {
+    public async login(username: string, password: string): Promise<string[] | null> {
         try {
             console.log('Attempting to login to ZwiftPower...');
 
@@ -73,7 +72,7 @@ export class ZwiftRaceScraper {
                 validateStatus: () => true,
             });
 
-            // Check if we're still being redirected to login or if we have access
+            // Get all cookies and return them as strings
             const cookies = await this.cookieJar.getCookies('https://zwiftpower.com');
             const hasAuthCookies = cookies.some(cookie => 
                 cookie.key.toLowerCase().includes('session') || 
@@ -85,74 +84,172 @@ export class ZwiftRaceScraper {
 
             if (hasAuthCookies || (testResponse.status === 200 && !testResponse.request?.path?.includes('login'))) {
                 console.log('Login successful!');
-                return true;
+                // Return cookies as strings that can be sent back to the client
+                return cookies.map(cookie => cookie.toString());
             }
 
             console.warn('Login may have failed - no authentication cookies found');
-            return false;
+            return null;
         } catch (error) {
             console.error('Login error:', error);
-            return false;
+            return null;
+        }
+    }
+
+    /**
+     * Set cookies from string array for authenticated requests
+     */
+    private async setCookiesFromStrings(cookieStrings: string[]): Promise<void> {
+        for (const cookieStr of cookieStrings) {
+            await this.cookieJar.setCookie(cookieStr, 'https://zwiftpower.com');
         }
     }
 
     /** Fetch Zwift IDs of riders in a given ZwiftPower race */
-    public async getRidersInRace(raceId: string): Promise<string[]> {
-        const url = ZwiftRaceScraper.ZP_EVENT_URL.replace("{race_id}", raceId);
-        const response = await this.axiosInstance.get(url);
-        const $ = cheerio.load(response.data);
+    public async getRidersInRace(raceId: string, cookies?: string[]): Promise<string[]> {
+        // Clear and set cookies if provided
+        if (cookies && cookies.length > 0) {
+            // Create a new instance with the provided cookies
+            const tempJar = new CookieJar();
+            const tempInstance = wrapper(axios.create({
+                jar: tempJar,
+                withCredentials: true,
+            }));
+            
+            for (const cookieStr of cookies) {
+                await tempJar.setCookie(cookieStr, 'https://zwiftpower.com');
+            }
+            
+            const url = ZwiftRaceScraper.ZP_EVENT_URL.replace("{race_id}", raceId);
+            const response = await tempInstance.get(url);
+            const $ = cheerio.load(response.data);
 
-        const riders = new Set<string>();
+            const riders = new Set<string>();
 
-        console.log(`Parsing riders from race page ${url}...`);
+            console.log(`Parsing riders from race page ${url}...`);
 
-        $("a[href*='profile.php?z=']").each((_, el) => {
-            console.log('Found rider link:', $(el).attr("href"));
-            const href = $(el).attr("href");
-            const match = href?.match(/z=(\d+)/);
-            if (match) riders.add(match[1]);
-        });
+            $("a[href*='profile.php?z=']").each((_, el) => {
+                console.log('Found rider link:', $(el).attr("href"));
+                const href = $(el).attr("href");
+                const match = href?.match(/z=(\d+)/);
+                if (match) riders.add(match[1]);
+            });
 
-        return Array.from(riders);
+            return Array.from(riders);
+        } else {
+            // Use default instance without custom cookies
+            const url = ZwiftRaceScraper.ZP_EVENT_URL.replace("{race_id}", raceId);
+            const response = await this.axiosInstance.get(url);
+            const $ = cheerio.load(response.data);
+
+            const riders = new Set<string>();
+
+            console.log(`Parsing riders from race page ${url}...`);
+
+            $("a[href*='profile.php?z=']").each((_, el) => {
+                console.log('Found rider link:', $(el).attr("href"));
+                const href = $(el).attr("href");
+                const match = href?.match(/z=(\d+)/);
+                if (match) riders.add(match[1]);
+            });
+
+            return Array.from(riders);
+        }
     }
 
     /** Fetch public Zwift activity IDs from a ZwiftPower profile page */
-    public async getPublicActivities(zwiftId: string): Promise<string[]> {
-        const url = ZwiftRaceScraper.ZP_PROFILE_URL.replace("{zwift_id}", zwiftId);
-        const response = await this.axiosInstance.get(url);
-        const $ = cheerio.load(response.data);
+    public async getPublicActivities(zwiftId: string, cookies?: string[]): Promise<string[]> {
+        // Clear and set cookies if provided
+        if (cookies && cookies.length > 0) {
+            const tempJar = new CookieJar();
+            const tempInstance = wrapper(axios.create({
+                jar: tempJar,
+                withCredentials: true,
+            }));
+            
+            for (const cookieStr of cookies) {
+                await tempJar.setCookie(cookieStr, 'https://zwiftpower.com');
+            }
+            
+            const url = ZwiftRaceScraper.ZP_PROFILE_URL.replace("{zwift_id}", zwiftId);
+            const response = await tempInstance.get(url);
+            const $ = cheerio.load(response.data);
 
-        const activities = new Set<string>();
+            const activities = new Set<string>();
 
-        $("a[href*='zwift.com/activity/']").each((_, el) => {
-            const href = $(el).attr("href");
-            const match = href?.match(/activity\/(\d+)/);
-            if (match) activities.add(match[1]);
-        });
+            $("a[href*='zwift.com/activity/']").each((_, el) => {
+                const href = $(el).attr("href");
+                const match = href?.match(/activity\/(\d+)/);
+                if (match) activities.add(match[1]);
+            });
 
-        return Array.from(activities);
+            return Array.from(activities);
+        } else {
+            const url = ZwiftRaceScraper.ZP_PROFILE_URL.replace("{zwift_id}", zwiftId);
+            const response = await this.axiosInstance.get(url);
+            const $ = cheerio.load(response.data);
+
+            const activities = new Set<string>();
+
+            $("a[href*='zwift.com/activity/']").each((_, el) => {
+                const href = $(el).attr("href");
+                const match = href?.match(/activity\/(\d+)/);
+                if (match) activities.add(match[1]);
+            });
+
+            return Array.from(activities);
+        }
     }
 
     /** Download a FIT file for an activity (public activities only) */
-    public async downloadFit(activityId: string): Promise<ArrayBuffer | null> {
+    public async downloadFit(activityId: string, cookies?: string[]): Promise<ArrayBuffer | null> {
         const url = ZwiftRaceScraper.ZWIFT_ACTIVITY_URL.replace("{activity_id}", activityId);
 
         try {
-            const response = await this.axiosInstance.get(url, {
-                responseType: "arraybuffer",
-                validateStatus: () => true
-            });
+            // Use custom cookies if provided
+            if (cookies && cookies.length > 0) {
+                const tempJar = new CookieJar();
+                const tempInstance = wrapper(axios.create({
+                    jar: tempJar,
+                    withCredentials: true,
+                }));
+                
+                for (const cookieStr of cookies) {
+                    await tempJar.setCookie(cookieStr, 'https://zwiftpower.com');
+                }
+                
+                const response = await tempInstance.get(url, {
+                    responseType: "arraybuffer",
+                    validateStatus: () => true
+                });
 
-            if (
-                response.status === 200 &&
-                String(response.headers["content-type"]).includes("application")
-            ) {
-                console.log(`Downloaded FIT file for activity ${activityId}`);
-                return response.data;
+                if (
+                    response.status === 200 &&
+                    String(response.headers["content-type"]).includes("application")
+                ) {
+                    console.log(`Downloaded FIT file for activity ${activityId}`);
+                    return response.data;
+                }
+
+                console.warn(`Failed to download FIT for ${activityId} (status=${response.status})`);
+                return null;
+            } else {
+                const response = await this.axiosInstance.get(url, {
+                    responseType: "arraybuffer",
+                    validateStatus: () => true
+                });
+
+                if (
+                    response.status === 200 &&
+                    String(response.headers["content-type"]).includes("application")
+                ) {
+                    console.log(`Downloaded FIT file for activity ${activityId}`);
+                    return response.data;
+                }
+
+                console.warn(`Failed to download FIT for ${activityId} (status=${response.status})`);
+                return null;
             }
-
-            console.warn(`Failed to download FIT for ${activityId} (status=${response.status})`);
-            return null;
         } catch (err) {
             console.error(`Error downloading activity ${activityId}:`, err);
             return null;
@@ -160,9 +257,9 @@ export class ZwiftRaceScraper {
     }
 
     /** Main function: download all public FIT files for all riders in a race */
-    public async pullRaceFitFiles(raceId: string): Promise<FitFileData[]> {
+    public async pullRaceFitFiles(raceId: string, cookies?: string[]): Promise<FitFileData[]> {
         console.log(`Fetching riders for race ${raceId}...`);
-        const riders = await this.getRidersInRace(raceId);
+        const riders = await this.getRidersInRace(raceId, cookies);
 
         console.log(`Found ${riders.length} riders.\n`);
 
@@ -170,7 +267,7 @@ export class ZwiftRaceScraper {
 
         for (const rid of riders) {
             console.log(`Processing rider ${rid}...`);
-            const activities = await this.getPublicActivities(rid);
+            const activities = await this.getPublicActivities(rid, cookies);
 
             if (!activities.length) {
                 console.log(` No public activities for rider ${rid}.`);
@@ -180,7 +277,7 @@ export class ZwiftRaceScraper {
             console.log(` Found ${activities.length} public activities.`);
 
             for (const act of activities) {
-                const data = await this.downloadFit(act);
+                const data = await this.downloadFit(act, cookies);
                 if (data) {
                     fitFiles.push({
                         activityId: act,

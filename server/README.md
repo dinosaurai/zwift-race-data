@@ -25,7 +25,7 @@ The server will run on `http://localhost:3001` by default.
 ### Login to ZwiftPower
 - `POST /api/login`
 - Authenticates with ZwiftPower using Zwift credentials
-- Stores cookies for subsequent authenticated requests
+- **Returns cookies** that should be used for subsequent authenticated requests
 - Request body:
   ```json
   {
@@ -37,7 +37,8 @@ The server will run on `http://localhost:3001` by default.
   ```json
   {
     "success": true,
-    "message": "Login successful"
+    "message": "Login successful",
+    "cookies": ["cookie1=value1; Path=/; Domain=.zwiftpower.com", "cookie2=value2; ..."]
   }
   ```
 - Response on failure:
@@ -52,29 +53,55 @@ The server will run on `http://localhost:3001` by default.
 ### Get Riders in Race
 - `GET /api/race/:raceId/riders`
 - Returns list of Zwift IDs for riders in a race
+- Optional: Include cookies in request header for authenticated access
+  - Header: `X-Zwift-Cookies: ["cookie1", "cookie2", ...]` (JSON array as string)
 
 ### Get Public Activities
 - `GET /api/rider/:zwiftId/activities`
 - Returns list of public activity IDs for a rider
+- Optional: Include cookies in request header for authenticated access
+  - Header: `X-Zwift-Cookies: ["cookie1", "cookie2", ...]` (JSON array as string)
 
 ### Download FIT File
 - `GET /api/activity/:activityId/fit`
 - Downloads a FIT file for a specific activity
+- Optional: Include cookies in request header for authenticated access
+  - Header: `X-Zwift-Cookies: ["cookie1", "cookie2", ...]` (JSON array as string)
 
 ### Pull All FIT Files for Race
 - `GET /api/race/:raceId/fit-files`
 - Downloads all FIT files for all riders in a race
 - Returns Base64-encoded data
+- Optional: Include cookies in request header for authenticated access
+  - Header: `X-Zwift-Cookies: ["cookie1", "cookie2", ...]` (JSON array as string)
 
 ## Authentication
 
-The server now supports authentication with ZwiftPower. To access protected resources or non-public data:
+The server now supports **per-request authentication** with ZwiftPower:
 
-1. Call the `/api/login` endpoint with your Zwift credentials
-2. The server will authenticate with ZwiftPower and store the session cookies
-3. Subsequent requests will use these stored cookies automatically
+1. **Login**: Call `/api/login` with Zwift credentials to receive cookies
+2. **Use cookies**: Include the returned cookies in the `X-Zwift-Cookies` header for subsequent requests that require authentication
+3. **No shared state**: Each user's credentials are isolated - the server does not store cookies between requests
 
-Note: Authentication persists for the lifetime of the server process. The cookies are stored in memory and will be lost when the server restarts.
+### Example Usage
+
+```bash
+# Step 1: Login and get cookies
+COOKIES=$(curl -X POST http://localhost:3001/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"your_username","password":"your_password"}' \
+  | jq -r '.cookies | tostring')
+
+# Step 2: Use cookies for authenticated request
+curl http://localhost:3001/api/race/12345/riders \
+  -H "X-Zwift-Cookies: $COOKIES"
+```
+
+**Benefits:**
+- Each user maintains their own authentication
+- No credential sharing between users
+- Server remains stateless
+- Cookies are managed by the client
 
 ## Environment Variables
 
