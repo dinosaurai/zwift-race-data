@@ -1,10 +1,20 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
 import { ZwiftRaceScraper } from './raceScraper.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Security: Add helmet for security headers including HSTS
+app.use(helmet({
+    hsts: {
+        maxAge: 31536000, // 1 year in seconds
+        includeSubDomains: true,
+        preload: true
+    }
+}));
 
 app.use(cors({
     origin: 'https://orange-journey-5456xjpj6g7395p-5173.app.github.dev',
@@ -22,6 +32,14 @@ app.use(cors({
 
 app.use(express.json());
 
+// Security: Configure logging to skip sensitive routes
+app.use(morgan('combined', {
+    skip: (req, res) => {
+        // Skip logging for login endpoint to prevent credential exposure
+        return req.path === '/api/login';
+    }
+}));
+
 
 const scraper = new ZwiftRaceScraper();
 
@@ -32,9 +50,14 @@ app.get('/api/health', (req, res) => {
 
 // Login to ZwiftPower
 app.post('/api/login', async (req, res) => {
+    // Security: Extract credentials and implement "hot potato" pattern
+    let username: string | undefined;
+    let password: string | undefined;
+    
     try {
-        console.log("Received login request");
-        const { username, password } = req.body;
+        // Extract credentials from request body
+        username = req.body.username;
+        password = req.body.password;
         
         if (!username || !password) {
             return res.status(400).json({ 
@@ -43,9 +66,13 @@ app.post('/api/login', async (req, res) => {
             });
         }
 
-        // Create a new scraper instance for this login
+        // Security: Immediately pass credentials to login and nullify
         const loginScraper = new ZwiftRaceScraper();
         const cookies = await loginScraper.login(username, password);
+        
+        // Security: Nullify credentials immediately after use ("hot potato" pattern)
+        username = undefined;
+        password = undefined;
         
         if (cookies) {
             res.json({ 
@@ -61,7 +88,12 @@ app.post('/api/login', async (req, res) => {
             });
         }
     } catch (error) {
-        console.error('Error during login:', error);
+        // Security: Ensure credentials are nullified even on error
+        username = undefined;
+        password = undefined;
+        
+        // Security: Log error without exposing sensitive data
+        console.error('Error during login: Authentication failed');
         res.status(500).json({ 
             error: 'Login failed',
             message: 'An error occurred during authentication'
