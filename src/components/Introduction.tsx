@@ -1,9 +1,7 @@
 import { useCallback, useState } from 'react';
 import './Introduction.css';
 import { useRaceData } from '../contexts/RaceDataContext';
-import { ZwiftRaceScraper } from '../data/raceScraper';
-
-const scraper = new ZwiftRaceScraper();
+import { apiClient } from '../data/apiClient';
 
 const Introduction = () => {
   const [raceId, setRaceId] = useState('');
@@ -15,7 +13,7 @@ const Introduction = () => {
   };
 
   const handleSubmit = useCallback(async () => {
-    const raceData = await scraper.pullRaceFitFiles(raceId);
+    const raceData = await apiClient.pullRaceFitFiles(raceId);
     console.log('Fetched race data:', raceData);
     // setData(raceData);
   }, [setData, raceId]);

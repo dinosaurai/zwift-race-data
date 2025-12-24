@@ -22,7 +22,10 @@ export class ZwiftRaceScraper {
 
         const riders = new Set<string>();
 
+        console.log(`Parsing riders from race page ${url}...`);
+
         $("a[href*='profile.php?z=']").each((_, el) => {
+            console.log('Found rider link:', $(el).attr("href"));
             const href = $(el).attr("href");
             const match = href?.match(/z=(\d+)/);
             if (match) riders.add(match[1]);
