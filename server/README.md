@@ -118,6 +118,8 @@ curl http://localhost:3001/api/race/12345/riders \
 ## Environment Variables
 
 - `PORT` - Server port (default: 3001)
+- `CORS_ORIGIN` - Allowed origin for CORS requests (default: development Codespace URL)
+  - In production, set this to your frontend URL: `https://your-frontend.example.com`
 
 ## Development
 

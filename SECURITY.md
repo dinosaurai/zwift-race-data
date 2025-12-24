@@ -67,6 +67,23 @@ Error logs are sanitized to prevent credential leakage:
 - Error details do not include request body contents
 - Console logging for authentication errors is generic: "Authentication failed"
 
+## Environment Variables
+
+### Required for Production:
+
+- `CORS_ORIGIN` - The allowed origin for CORS requests (your frontend URL)
+  - Example: `https://your-app.example.com`
+  - Default: Development Codespace URL (should be overridden in production)
+
+- `PORT` - Server port (default: 3001)
+
+### Example .env file:
+
+```env
+PORT=3001
+CORS_ORIGIN=https://your-production-frontend.com
+```
+
 ## Deployment Recommendations
 
 ### For Production Environments:

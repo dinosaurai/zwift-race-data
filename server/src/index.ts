@@ -16,8 +16,10 @@ app.use(helmet({
     }
 }));
 
+// Configure CORS with environment-based origin
+const allowedOrigin = process.env.CORS_ORIGIN || 'https://orange-journey-5456xjpj6g7395p-5173.app.github.dev';
 app.use(cors({
-    origin: 'https://orange-journey-5456xjpj6g7395p-5173.app.github.dev',
+    origin: allowedOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
         'Content-Type',
@@ -59,10 +61,26 @@ app.post('/api/login', async (req, res) => {
         username = req.body.username;
         password = req.body.password;
         
+        // Security: Validate credentials are strings and have reasonable lengths
         if (!username || !password) {
             return res.status(400).json({ 
                 error: 'Missing credentials',
                 message: 'Username and password are required'
+            });
+        }
+        
+        if (typeof username !== 'string' || typeof password !== 'string') {
+            return res.status(400).json({ 
+                error: 'Invalid credentials',
+                message: 'Username and password must be strings'
+            });
+        }
+        
+        // Prevent extremely long inputs that could be attack vectors
+        if (username.length > 255 || password.length > 255) {
+            return res.status(400).json({ 
+                error: 'Invalid credentials',
+                message: 'Username and password are too long'
             });
         }
 
