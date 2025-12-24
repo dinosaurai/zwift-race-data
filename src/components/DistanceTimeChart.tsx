@@ -90,16 +90,23 @@ const DistanceTimeChart = () => {
     // If normalize time is enabled, subtract the lead rider's time at each distance point
     if (normalizeTime && result.length > 0) {
       result = result.map(point => {
-        // Find the minimum time at this distance (the lead rider)
+        // Find the minimum time and build normalized point in one pass
         let minTime = Infinity;
+        const normalizedPoint: { distance: number; [key: string]: number } = { distance: point.distance };
+        
+        // First pass: find minimum time
         Object.keys(point).forEach(key => {
           if (key !== 'distance' && typeof point[key] === 'number') {
             minTime = Math.min(minTime, point[key]);
           }
         });
         
-        // Subtract the lead rider's time from all competitors
-        const normalizedPoint: { distance: number; [key: string]: number } = { distance: point.distance };
+        // If no valid times found, return original point
+        if (minTime === Infinity) {
+          return point;
+        }
+        
+        // Second pass: normalize by subtracting minimum
         Object.keys(point).forEach(key => {
           if (key !== 'distance' && typeof point[key] === 'number') {
             normalizedPoint[key] = point[key] - minTime;
