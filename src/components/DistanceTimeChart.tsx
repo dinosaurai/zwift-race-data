@@ -9,6 +9,7 @@ const DistanceTimeChart = () => {
   const [refAreaLeft, setRefAreaLeft] = useState<string | number>('');
   const [refAreaRight, setRefAreaRight] = useState<string | number>('');
   const [zoomDomain, setZoomDomain] = useState<{ left: number | 'auto'; right: number | 'auto' }>({ left: 'auto', right: 'auto' });
+  const [normalizeTime, setNormalizeTime] = useState<boolean>(false);
   const chartRef = useRef<any>(null);
 
   // Get unique categories
@@ -84,7 +85,32 @@ const DistanceTimeChart = () => {
       });
     });
 
-    const result = Object.values(chartMap).sort((a, b) => a.distance - b.distance);
+    let result = Object.values(chartMap).sort((a, b) => a.distance - b.distance);
+    
+    // If normalize time is enabled, subtract the lead rider's time at each distance point
+    if (normalizeTime && result.length > 0) {
+      result = result.map(point => {
+        // Find the minimum time at this distance (the lead rider)
+        let minTime = Infinity;
+        Object.keys(point).forEach(key => {
+          if (key !== 'distance' && typeof point[key] === 'number') {
+            minTime = Math.min(minTime, point[key]);
+          }
+        });
+        
+        // Subtract the lead rider's time from all competitors
+        const normalizedPoint: { distance: number; [key: string]: number } = { distance: point.distance };
+        Object.keys(point).forEach(key => {
+          if (key !== 'distance' && typeof point[key] === 'number') {
+            normalizedPoint[key] = point[key] - minTime;
+          } else if (key === 'distance') {
+            normalizedPoint[key] = point[key];
+          }
+        });
+        
+        return normalizedPoint;
+      });
+    }
     
     // If zoomed, filter to only show data in the zoomed range
     if (isZoomed) {
@@ -94,7 +120,7 @@ const DistanceTimeChart = () => {
     }
     
     return result;
-  }, [filteredData, zoomDomain]);
+  }, [filteredData, zoomDomain, normalizeTime]);
 
   // Calculate Y-axis domain based on visible data
   const yAxisDomain = useMemo(() => {
@@ -171,7 +197,9 @@ const DistanceTimeChart = () => {
       <h2>Distance vs. Time</h2>
       <p className="chart-description">
         This chart shows how much time each rider took to reach various distances throughout the race.
-        Lower times indicate faster performance.
+        {normalizeTime 
+          ? " Time is normalized to show the gap to the race leader at each distance point."
+          : " Lower times indicate faster performance."}
       </p>
       
       <div style={{ marginBottom: '20px', display: 'flex', gap: '20px', alignItems: 'center' }}>
@@ -197,6 +225,18 @@ const DistanceTimeChart = () => {
               </option>
             ))}
           </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <input
+            type="checkbox"
+            id="normalize-time"
+            checked={normalizeTime}
+            onChange={(e) => setNormalizeTime(e.target.checked)}
+            style={{ cursor: 'pointer' }}
+          />
+          <label htmlFor="normalize-time" style={{ cursor: 'pointer', fontSize: '14px' }}>
+            Normalize by leader
+          </label>
         </div>
         {(zoomDomain.left !== 'auto' || zoomDomain.right !== 'auto') && (
           <button
@@ -237,7 +277,7 @@ const DistanceTimeChart = () => {
             tickFormatter={(value) => Number(value).toFixed(2)}
           />
           <YAxis 
-            label={{ value: 'Time (minutes)', angle: -90, position: 'insideLeft' }}
+            label={{ value: normalizeTime ? 'Time Gap (minutes)' : 'Time (minutes)', angle: -90, position: 'insideLeft' }}
             domain={yAxisDomain}
             tickFormatter={(value) => Number(value).toFixed(2)}
           />
