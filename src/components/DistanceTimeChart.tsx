@@ -103,8 +103,6 @@ const DistanceTimeChart = () => {
         Object.keys(point).forEach(key => {
           if (key !== 'distance' && typeof point[key] === 'number') {
             normalizedPoint[key] = point[key] - minTime;
-          } else if (key === 'distance') {
-            normalizedPoint[key] = point[key];
           }
         });
         
