@@ -10,7 +10,7 @@ export interface FitFileData {
 
 export interface DatasetItem {
     unit: string;
-    yData: number[];
+    data: number[];
 }
 
 export interface ActivityData {
