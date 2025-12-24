@@ -1,20 +1,19 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, type ReactNode } from 'react';
-import { type CompetitorData, sampleRaceData } from '../data/sampleData';
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import { type CompetitorData } from '../data/sampleData';
 
 interface RaceDataContextType {
-  competitors: CompetitorData[];
+  data: CompetitorData[];
+  setData: React.Dispatch<React.SetStateAction<CompetitorData[]>>;
 }
 
 const RaceDataContext = createContext<RaceDataContextType | undefined>(undefined);
 
 export const RaceDataProvider = ({ children }: { children: ReactNode }) => {
-  const value = {
-    competitors: sampleRaceData,
-  };
+  const [data, setData] = useState<CompetitorData[]>([]);
 
   return (
-    <RaceDataContext.Provider value={value}>
+    <RaceDataContext.Provider value={{data, setData}}>
       {children}
     </RaceDataContext.Provider>
   );
