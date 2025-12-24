@@ -83,6 +83,18 @@ The server now supports **per-request authentication** with ZwiftPower:
 2. **Use cookies**: Include the returned cookies in the `X-Zwift-Cookies` header for subsequent requests that require authentication
 3. **No shared state**: Each user's credentials are isolated - the server does not store cookies between requests
 
+### Security Features
+
+The authentication system implements several security best practices:
+
+- **HTTPS with HSTS**: Server enforces HTTPS connections with HTTP Strict Transport Security headers
+- **Helmet Security Headers**: Additional security headers protect against common vulnerabilities
+- **"Hot Potato" Pattern**: Credentials are immediately used and nullified after authentication
+- **Secure Logging**: The `/api/login` endpoint is excluded from request logs to prevent credential exposure
+- **Sanitized Errors**: Error messages don't expose sensitive information
+
+See [../SECURITY.md](../SECURITY.md) for comprehensive security documentation.
+
 ### Example Usage
 
 ```bash
@@ -111,6 +123,8 @@ curl http://localhost:3001/api/race/12345/riders \
 
 The server uses:
 - Express for the API framework
+- Helmet for security headers (HSTS, CSP, etc.)
+- Morgan for request logging with sensitive endpoint filtering
 - Axios for HTTP requests
 - Cheerio for HTML parsing
 - CORS middleware for cross-origin requests

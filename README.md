@@ -66,6 +66,18 @@ The backend server provides endpoints for:
 
 See [server/README.md](server/README.md) for API documentation.
 
+## Security
+
+This application implements several security best practices to protect user credentials:
+
+- **HTTPS with HSTS**: Enforces secure connections and prevents downgrade attacks
+- **Helmet Security Headers**: Provides additional security headers for protection
+- **Credential Protection**: Implements "hot potato" pattern - credentials are nullified immediately after use
+- **Secure Logging**: Authentication endpoints are excluded from request logs to prevent credential exposure
+- **Sanitized Error Messages**: Error logs don't expose sensitive information
+
+For detailed security information, see [SECURITY.md](SECURITY.md).
+
 ### Features
 
 - **React Context**: Data is managed and shared across components using React Context
