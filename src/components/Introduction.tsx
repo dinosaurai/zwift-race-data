@@ -72,11 +72,17 @@ const Introduction = () => {
     <section className="introduction">
       <h1>Zwift Race Data Viewer</h1>
       <p>
-        Welcome to the Zwift Race Data Viewer. This application allows you to visualize and analyze race data 
-        from yourself and other competitors. See how a race unfolded and understand what was happening at each 
-        point in time. The charts below show distance vs. time and distance vs. power output for multiple riders, 
-        helping you identify key moments in the race, compare performance across competitors, and gain insights 
-        into race dynamics.
+        <strong>Unlock the story behind every Zwift race.</strong> Visualize and analyze race data from yourself 
+        and your competitors with powerful, interactive charts. See exactly how the race unfolded, identify the 
+        decisive attacks, compare power outputs, and understand the tactics that shaped the outcome. Whether you're 
+        preparing for your next race or reliving past glory, gain the insights you need to race smarter.
+      </p>
+      <p className="privacy-notice">
+        <strong>Your privacy matters.</strong> We don't store, track, or use your data for any other purpose. 
+        This is a free, open-source tool built by cyclists, for cyclists. All code is publicly available on{' '}
+        <a href="https://github.com/dinosaurai/zwift-race-data" target="_blank" rel="noopener noreferrer">
+          GitHub
+        </a> — verify for yourself that your data stays yours.
       </p>
 
       <div className="login-section">
