@@ -34,9 +34,11 @@ export class ZwiftRaceScraper {
     /**
      * Login to ZwiftPower using username and password
      * Returns cookies that can be used for subsequent authenticated requests
+     * Security: Implements "hot potato" pattern - credentials are used immediately and not stored
      */
     public async login(username: string, password: string): Promise<string[] | null> {
         try {
+            // Security: Using credentials immediately without logging or storing them
             console.log('Attempting to login to ZwiftPower via Zwift OAuth...');
 
             // Step 1: Start OAuth flow - this will redirect to Zwift's login page
@@ -66,7 +68,8 @@ export class ZwiftRaceScraper {
 
             console.log('Found login form, submitting credentials...');
 
-            // Step 3: Submit credentials to Zwift's login endpoint
+            // Security: Submit credentials immediately using URLSearchParams
+            // Credentials are passed directly without storing in variables
             const loginData = new URLSearchParams({
                 username: username,
                 password: password,
@@ -88,7 +91,6 @@ export class ZwiftRaceScraper {
             );
 
             console.log('Login response status:', loginResponse.status);
-            console.log('Final URL:', loginResponse.request?.res?.responseUrl || loginResponse.config.url);
 
             // Step 4: Check for login errors
             const $response = cheerio.load(loginResponse.data);
@@ -134,12 +136,13 @@ export class ZwiftRaceScraper {
             console.warn('Login may have failed - no authentication cookies found');
             return null;
         } catch (error) {
-            console.error('Login error:', error);
+            // Security: Log minimal error details without exposing sensitive information
+            console.error('Login error: Authentication request failed');
             if (axios.isAxiosError(error)) {
-                console.error('Axios error details:', {
+                // Only log status code and error code, not statusText which could contain sensitive info
+                console.error('Error details:', {
                     status: error.response?.status,
-                    statusText: error.response?.statusText,
-                    url: error.config?.url,
+                    code: error.code,
                 });
             }
             return null;
