@@ -15,6 +15,7 @@ export class ZwiftRaceScraper {
     private static ZWIFT_ACTIVITY_URL = "https://www.zwift.com/activity/{activity_id}/files/activity.fit";
     private static ZP_LOGIN_URL = "https://zwiftpower.com/ucp.php?mode=login";
     private static ZWIFT_AUTH_URL = "https://secure.zwift.com/auth/rb_bf03895d94";
+    private static USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
 
     private cookieJar: CookieJar;
     private axiosInstance: AxiosInstance;
@@ -56,7 +57,7 @@ export class ZwiftRaceScraper {
                 {
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'User-Agent': ZwiftRaceScraper.USER_AGENT,
                     },
                     maxRedirects: 5,
                     validateStatus: () => true,
@@ -65,16 +66,29 @@ export class ZwiftRaceScraper {
 
             console.log('Auth response status:', authResponse.status);
 
-            // Check if we have cookies set
-            const cookies = await this.cookieJar.getCookies('https://zwiftpower.com');
-            console.log('Cookies after login:', cookies.length);
+            // Step 3: Validate authentication by attempting to access a protected resource
+            // Make a test request to ZwiftPower to verify we have valid session cookies
+            const testResponse = await this.axiosInstance.get(ZwiftRaceScraper.ZP_LOGIN_URL, {
+                maxRedirects: 5,
+                validateStatus: () => true,
+            });
 
-            if (cookies.length > 0) {
+            // Check if we're still being redirected to login or if we have access
+            const cookies = await this.cookieJar.getCookies('https://zwiftpower.com');
+            const hasAuthCookies = cookies.some(cookie => 
+                cookie.key.toLowerCase().includes('session') || 
+                cookie.key.toLowerCase().includes('auth') ||
+                cookie.key === 'bb_password'
+            );
+
+            console.log('Cookies after login:', cookies.length, 'Auth cookies found:', hasAuthCookies);
+
+            if (hasAuthCookies || (testResponse.status === 200 && !testResponse.request?.path?.includes('login'))) {
                 console.log('Login successful!');
                 return true;
             }
 
-            console.warn('Login may have failed - no cookies set');
+            console.warn('Login may have failed - no authentication cookies found');
             return false;
         } catch (error) {
             console.error('Login error:', error);

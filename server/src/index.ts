@@ -50,7 +50,7 @@ app.post('/api/login', async (req, res) => {
         console.error('Error during login:', error);
         res.status(500).json({ 
             error: 'Login failed',
-            message: error instanceof Error ? error.message : 'Unknown error'
+            message: 'An error occurred during authentication'
         });
     }
 });
