@@ -18,8 +18,13 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
       return savedTheme;
     }
     // Check system preference
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
+    try {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return 'dark';
+      }
+    } catch (error) {
+      // matchMedia not supported or error occurred, default to light
+      console.warn('matchMedia not supported:', error);
     }
     return 'light';
   });
