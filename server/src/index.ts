@@ -23,6 +23,38 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 
+// Login to ZwiftPower
+app.post('/api/login', async (req, res) => {
+    try {
+        const { username, password } = req.body;
+        
+        if (!username || !password) {
+            return res.status(400).json({ 
+                error: 'Missing credentials',
+                message: 'Username and password are required'
+            });
+        }
+
+        const success = await scraper.login(username, password);
+        
+        if (success) {
+            res.json({ success: true, message: 'Login successful' });
+        } else {
+            res.status(401).json({ 
+                success: false,
+                error: 'Login failed',
+                message: 'Invalid credentials or authentication error'
+            });
+        }
+    } catch (error) {
+        console.error('Error during login:', error);
+        res.status(500).json({ 
+            error: 'Login failed',
+            message: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+});
+
 // Get riders in a race
 app.get('/api/race/:raceId/riders', async (req, res) => {
     try {
