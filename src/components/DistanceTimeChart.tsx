@@ -1,10 +1,12 @@
 import { useState, useMemo, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea } from 'recharts';
 import { useRaceData } from '../contexts/RaceDataContext';
+import { useTheme } from '../contexts/ThemeContext';
 import './DistanceTimeChart.css';
 
 const DistanceTimeChart = () => {
   const { data } = useRaceData();
+  const { theme } = useTheme();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [refAreaLeft, setRefAreaLeft] = useState<string | number>('');
   const [refAreaRight, setRefAreaRight] = useState<string | number>('');
@@ -146,13 +148,14 @@ const DistanceTimeChart = () => {
     if (active && payload && payload.length) {
       return (
         <div style={{
-          backgroundColor: 'white',
-          border: '1px solid #ccc',
+          backgroundColor: theme === 'light' ? 'white' : '#2a2a2a',
+          border: `1px solid ${theme === 'light' ? '#ccc' : '#555'}`,
           borderRadius: '4px',
           padding: '10px',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          boxShadow: theme === 'light' ? '0 2px 4px rgba(0,0,0,0.1)' : '0 2px 4px rgba(0,0,0,0.5)',
+          color: theme === 'light' ? '#333' : '#e0e0e0'
         }}>
-          <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', borderBottom: '1px solid #eee', paddingBottom: '5px' }}>
+          <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', borderBottom: `1px solid ${theme === 'light' ? '#eee' : '#444'}`, paddingBottom: '5px' }}>
             Distance: {Number(label).toFixed(2)} km
           </p>
           {payload.map((entry: any, index: number) => (
@@ -186,9 +189,11 @@ const DistanceTimeChart = () => {
             style={{
               padding: '8px 12px',
               borderRadius: '4px',
-              border: '1px solid #ccc',
+              border: `1px solid ${theme === 'light' ? '#ccc' : '#555'}`,
               fontSize: '14px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              backgroundColor: theme === 'light' ? 'white' : '#2a2a2a',
+              color: theme === 'light' ? '#333' : '#e0e0e0'
             }}
           >
             {categories.map(cat => (
@@ -204,16 +209,17 @@ const DistanceTimeChart = () => {
             style={{
               padding: '8px 16px',
               borderRadius: '4px',
-              border: '1px solid #ccc',
-              backgroundColor: '#f0f0f0',
+              border: `1px solid ${theme === 'light' ? '#ccc' : '#555'}`,
+              backgroundColor: theme === 'light' ? '#f0f0f0' : '#3a3a3a',
               fontSize: '14px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              color: theme === 'light' ? '#333' : '#e0e0e0'
             }}
           >
             Reset Zoom
           </button>
         )}
-        <span style={{ fontSize: '12px', color: '#666' }}>
+        <span style={{ fontSize: '12px', color: theme === 'light' ? '#666' : '#b0b0b0' }}>
           💡 Click and drag to zoom, scroll to pan
         </span>
       </div>
@@ -227,19 +233,23 @@ const DistanceTimeChart = () => {
           onMouseMove={(e) => refAreaLeft && e && e.activeLabel && setRefAreaRight(e.activeLabel)}
           onMouseUp={zoom}
         >
-          <CartesianGrid strokeDasharray="3 3" />
+          <CartesianGrid strokeDasharray="3 3" stroke={theme === 'light' ? '#ccc' : '#444'} />
           <XAxis 
             dataKey="distance" 
-            label={{ value: 'Distance (km)', position: 'insideBottom', offset: -5 }}
+            label={{ value: 'Distance (km)', position: 'insideBottom', offset: -5, fill: theme === 'light' ? '#666' : '#b0b0b0' }}
             domain={[zoomDomain.left, zoomDomain.right]}
             type="number"
             allowDataOverflow={true}
             tickFormatter={(value) => Number(value).toFixed(2)}
+            stroke={theme === 'light' ? '#666' : '#b0b0b0'}
+            tick={{ fill: theme === 'light' ? '#666' : '#b0b0b0' }}
           />
           <YAxis 
-            label={{ value: 'Time (minutes)', angle: -90, position: 'insideLeft' }}
+            label={{ value: 'Time (minutes)', angle: -90, position: 'insideLeft', fill: theme === 'light' ? '#666' : '#b0b0b0' }}
             domain={yAxisDomain}
             tickFormatter={(value) => Number(value).toFixed(2)}
+            stroke={theme === 'light' ? '#666' : '#b0b0b0'}
+            tick={{ fill: theme === 'light' ? '#666' : '#b0b0b0' }}
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend />

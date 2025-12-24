@@ -5,20 +5,20 @@
 }
 
 .introduction h1 {
-  color: #333;
+  color: light-dark(#333, #e0e0e0);
   font-size: 2.5rem;
   margin-bottom: 20px;
 }
 
 .introduction h2 {
-  color: #444;
+  color: light-dark(#444, #d0d0d0);
   font-size: 1.8rem;
   margin-top: 30px;
   margin-bottom: 15px;
 }
 
 .introduction p {
-  color: #666;
+  color: light-dark(#666, #b0b0b0);
   font-size: 1.1rem;
   line-height: 1.6;
   max-width: 900px;
@@ -27,13 +27,13 @@
 .login-section {
   margin-top: 40px;
   padding: 25px;
-  background-color: #f8f9fa;
+  background-color: light-dark(#f8f9fa, #222);
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid light-dark(#e0e0e0, #444);
 }
 
 .login-info {
-  color: #666;
+  color: light-dark(#666, #b0b0b0);
   font-size: 0.95rem;
   margin-bottom: 15px;
 }
@@ -50,9 +50,11 @@
   min-width: 200px;
   padding: 12px 16px;
   font-size: 1rem;
-  border: 1px solid #ccc;
+  border: 1px solid light-dark(#ccc, #555);
   border-radius: 4px;
   transition: border-color 0.3s;
+  background-color: light-dark(white, #2a2a2a);
+  color: light-dark(#333, #e0e0e0);
 }
 
 .login-form input:focus {
@@ -61,7 +63,7 @@
 }
 
 .login-form input:disabled {
-  background-color: #f5f5f5;
+  background-color: light-dark(#f5f5f5, #1a1a1a);
   cursor: not-allowed;
 }
 
@@ -85,7 +87,7 @@
 
 .login-form button:disabled,
 .race-form button:disabled {
-  background-color: #cccccc;
+  background-color: light-dark(#cccccc, #555);
   cursor: not-allowed;
 }
 
@@ -97,15 +99,15 @@
 }
 
 .login-message.success {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+  background-color: light-dark(#d4edda, #1a4d2e);
+  color: light-dark(#155724, #90ee90);
+  border: 1px solid light-dark(#c3e6cb, #2d7a4f);
 }
 
 .login-message.error {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background-color: light-dark(#f8d7da, #4d1a1e);
+  color: light-dark(#721c24, #ffb3ba);
+  border: 1px solid light-dark(#f5c6cb, #7a2d35);
 }
 
 .logged-in-status {
@@ -135,9 +137,9 @@
 .race-section {
   margin-top: 40px;
   padding: 25px;
-  background-color: #f8f9fa;
+  background-color: light-dark(#f8f9fa, #222);
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid light-dark(#e0e0e0, #444);
 }
 
 .race-form {
@@ -152,9 +154,11 @@
   min-width: 300px;
   padding: 12px 16px;
   font-size: 1rem;
-  border: 1px solid #ccc;
+  border: 1px solid light-dark(#ccc, #555);
   border-radius: 4px;
   transition: border-color 0.3s;
+  background-color: light-dark(white, #2a2a2a);
+  color: light-dark(#333, #e0e0e0);
 }
 
 .race-form input:focus {
@@ -163,7 +167,7 @@
 }
 
 .race-form input:disabled {
-  background-color: #f5f5f5;
+  background-color: light-dark(#f5f5f5, #1a1a1a);
   cursor: not-allowed;
 }
 
