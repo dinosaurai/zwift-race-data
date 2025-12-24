@@ -3,19 +3,22 @@ import * as cheerio from "cheerio";
 import { CookieJar } from "tough-cookie";
 import { wrapper } from "axios-cookiejar-support";
 
-export interface FitFileData {
-    activityId: string;
+export interface RiderData {
     zwiftId: string;
-    data: ArrayBuffer;
+    name: string;
+    category?: string;
+    weight?: number;
+    ftp?: number;
+    flag?: string;
+    age?: string;
 }
 
 export class ZwiftRaceScraper {
-    private static ZP_EVENT_URL = "https://zwiftpower.com/events.php?zid={race_id}";
-    private static ZP_PROFILE_URL = "https://zwiftpower.com/profile.php?z={zwift_id}";
-    private static ZWIFT_ACTIVITY_URL = "https://www.zwift.com/activity/{activity_id}/files/activity.fit";
-    private static ZP_LOGIN_URL = "https://zwiftpower.com/ucp.php?mode=login";
-    private static ZWIFT_AUTH_URL = "https://secure.zwift.com/auth/rb_bf03895d94";
-    private static USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36";
+    private static ZP_RESULTS_JSON_URL = "https://zwiftpower.com/cache3/results/{race_id}_zwift.json";
+    private static ZP_VIEW_JSON_URL = "https://zwiftpower.com/cache3/results/{race_id}_view.json";
+    private static ZP_ANALYSIS_URL = "https://zwiftpower.com/api3.php?do=analysis&zwift_id={zwift_id}&zwift_event_id={race_id}";
+    private static ZP_LOGIN_URL = "https://zwiftpower.com/ucp.php?mode=login&login=external&oauth_service=oauthzpsso";
+    private static USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
     private cookieJar: CookieJar;
     private axiosInstance: AxiosInstance;
@@ -34,64 +37,111 @@ export class ZwiftRaceScraper {
      */
     public async login(username: string, password: string): Promise<string[] | null> {
         try {
-            console.log('Attempting to login to ZwiftPower...');
+            console.log('Attempting to login to ZwiftPower via Zwift OAuth...');
 
-            // Step 1: Get the login page to initialize session
-            const loginPageResponse = await this.axiosInstance.get(ZwiftRaceScraper.ZP_LOGIN_URL, {
-                maxRedirects: 5,
+            // Step 1: Start OAuth flow - this will redirect to Zwift's login page
+            const oauthInitResponse = await this.axiosInstance.get(ZwiftRaceScraper.ZP_LOGIN_URL, {
+                headers: {
+                    'User-Agent': ZwiftRaceScraper.USER_AGENT,
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                },
+                maxRedirects: 10, // Follow redirects to Zwift's login page
                 validateStatus: () => true,
             });
 
-            console.log('Login page status:', loginPageResponse.status);
+            console.log('OAuth init status:', oauthInitResponse.status);
+            console.log('OAuth URL:', oauthInitResponse.request?.res?.responseUrl || oauthInitResponse.config.url);
 
-            // Step 2: Submit credentials to Zwift authentication
-            // ZwiftPower uses OAuth SSO with Zwift, so we need to authenticate with Zwift
-            const authResponse = await this.axiosInstance.post(
-                ZwiftRaceScraper.ZWIFT_AUTH_URL,
-                new URLSearchParams({
-                    username: username,
-                    password: password,
-                    remember_me: 'on',
-                }),
+            // Step 2: Parse the Zwift login page to get the form action URL
+            const $ = cheerio.load(oauthInitResponse.data);
+            const formAction = $('form.zwift-form').attr('action');
+            
+            if (!formAction) {
+                console.error('Could not find login form action. Response may not be the login page.');
+                // Log the page content snippet for debugging
+                console.log('Page title:', $('title').text());
+                console.log('Forms found:', $('form').length);
+                return null;
+            }
+
+            console.log('Found login form, submitting credentials...');
+
+            // Step 3: Submit credentials to Zwift's login endpoint
+            const loginData = new URLSearchParams({
+                username: username,
+                password: password,
+                credentialId: '',
+            });
+
+            const loginResponse = await this.axiosInstance.post(
+                formAction,
+                loginData,
                 {
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'User-Agent': ZwiftRaceScraper.USER_AGENT,
+                        'Referer': oauthInitResponse.request?.res?.responseUrl || ZwiftRaceScraper.ZP_LOGIN_URL,
                     },
-                    maxRedirects: 5,
+                    maxRedirects: 10, // Follow redirects back to ZwiftPower
                     validateStatus: () => true,
                 }
             );
 
-            console.log('Auth response status:', authResponse.status);
+            console.log('Login response status:', loginResponse.status);
+            console.log('Final URL:', loginResponse.request?.res?.responseUrl || loginResponse.config.url);
 
-            // Step 3: Validate authentication by attempting to access a protected resource
-            // Make a test request to ZwiftPower to verify we have valid session cookies
-            const testResponse = await this.axiosInstance.get(ZwiftRaceScraper.ZP_LOGIN_URL, {
-                maxRedirects: 5,
-                validateStatus: () => true,
-            });
+            // Step 4: Check for login errors
+            const $response = cheerio.load(loginResponse.data);
+            const hasError = $response('.kc-feedback-text').length > 0 || 
+                           $response('.alert-error').length > 0 ||
+                           loginResponse.data.includes('Invalid username or password');
 
-            // Get all cookies and return them as strings
-            const cookies = await this.cookieJar.getCookies('https://zwiftpower.com');
-            const hasAuthCookies = cookies.some(cookie => 
+            if (hasError) {
+                const errorText = $response('.kc-feedback-text').text() || 'Invalid username or password';
+                console.error('Login error:', errorText);
+                return null;
+            }
+
+            // Step 5: Get all cookies from both domains
+            const zpCookies = await this.cookieJar.getCookies('https://zwiftpower.com');
+            const zwiftCookies = await this.cookieJar.getCookies('https://secure.zwift.com');
+            
+            console.log('ZwiftPower cookies:', zpCookies.map(c => c.key));
+            console.log('Zwift cookies:', zwiftCookies.map(c => c.key));
+            
+            const hasZPAuthCookies = zpCookies.some(cookie => 
                 cookie.key.toLowerCase().includes('session') || 
-                cookie.key.toLowerCase().includes('auth') ||
-                cookie.key === 'bb_password'
+                cookie.key.toLowerCase().includes('phpbb') ||
+                cookie.key.includes('bb_') ||
+                cookie.key.toLowerCase().includes('sid')
             );
 
-            console.log('Cookies after login:', cookies.length, 'Auth cookies found:', hasAuthCookies);
+            const hasZwiftAuthCookies = zwiftCookies.some(cookie =>
+                cookie.key.toLowerCase().includes('keycloak') ||
+                cookie.key.toLowerCase().includes('auth')
+            );
 
-            if (hasAuthCookies || (testResponse.status === 200 && !testResponse.request?.path?.includes('login'))) {
+            console.log('Has ZwiftPower auth cookies:', hasZPAuthCookies);
+            console.log('Has Zwift auth cookies:', hasZwiftAuthCookies);
+
+            if (hasZPAuthCookies || hasZwiftAuthCookies) {
                 console.log('Login successful!');
-                // Return cookies as strings that can be sent back to the client
-                return cookies.map(cookie => cookie.toString());
+                // Return all cookies from both domains
+                const allCookies = [...zpCookies, ...zwiftCookies];
+                return allCookies.map(cookie => cookie.toString());
             }
 
             console.warn('Login may have failed - no authentication cookies found');
             return null;
         } catch (error) {
             console.error('Login error:', error);
+            if (axios.isAxiosError(error)) {
+                console.error('Axios error details:', {
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    url: error.config?.url,
+                });
+            }
             return null;
         }
     }
@@ -108,7 +158,19 @@ export class ZwiftRaceScraper {
             }));
             
             for (const cookieStr of cookies) {
-                await tempJar.setCookie(cookieStr, 'https://zwiftpower.com');
+                // Set cookies for both ZwiftPower and Zwift domains
+                try {
+                    if (cookieStr.includes('zwiftpower.com') || cookieStr.includes('Domain=.zwiftpower.com')) {
+                        await tempJar.setCookie(cookieStr, 'https://zwiftpower.com');
+                    } else if (cookieStr.includes('zwift.com')) {
+                        await tempJar.setCookie(cookieStr, 'https://secure.zwift.com');
+                    } else {
+                        // Try ZwiftPower domain as default
+                        await tempJar.setCookie(cookieStr, 'https://zwiftpower.com');
+                    }
+                } catch (err) {
+                    console.warn('Failed to set cookie:', cookieStr.substring(0, 50), err);
+                }
             }
             
             return tempInstance;
@@ -116,105 +178,145 @@ export class ZwiftRaceScraper {
         return this.axiosInstance;
     }
 
-    /** Fetch Zwift IDs of riders in a given ZwiftPower race */
-    public async getRidersInRace(raceId: string, cookies?: string[]): Promise<string[]> {
-        const instance = await this.createAxiosInstance(cookies);
-        const url = ZwiftRaceScraper.ZP_EVENT_URL.replace("{race_id}", raceId);
-        const response = await instance.get(url);
-        const $ = cheerio.load(response.data);
-
-        const riders = new Set<string>();
-
-        console.log(`Parsing riders from race page ${url}...`);
-
-        $("a[href*='profile.php?z=']").each((_, el) => {
-            console.log('Found rider link:', $(el).attr("href"));
-            const href = $(el).attr("href");
-            const match = href?.match(/z=(\d+)/);
-            if (match) riders.add(match[1]);
-        });
-
-        return Array.from(riders);
+    /**
+     * Helper method to handle 429 rate limit errors with exponential backoff retry
+     */
+    private async retryOnRateLimit<T>(
+        requestFn: () => Promise<T>,
+        maxRetries: number = 3,
+        initialDelayMs: number = 1000
+    ): Promise<T> {
+        let lastError: any;
+        
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                return await requestFn();
+            } catch (error) {
+                if (axios.isAxiosError(error) && error.response?.status === 429) {
+                    if (attempt < maxRetries) {
+                        const delayMs = initialDelayMs * Math.pow(2, attempt);
+                        console.warn(`Rate limited (429). Retrying in ${delayMs}ms... (attempt ${attempt + 1}/${maxRetries})`);
+                        await new Promise(resolve => setTimeout(resolve, delayMs));
+                        lastError = error;
+                        continue;
+                    }
+                }
+                throw error;
+            }
+        }
+        
+        throw lastError;
     }
 
-    /** Fetch public Zwift activity IDs from a ZwiftPower profile page */
-    public async getPublicActivities(zwiftId: string, cookies?: string[]): Promise<string[]> {
+    /** Fetch Zwift IDs and names of riders in a given ZwiftPower race */
+    public async getRidersInRace(raceId: string, cookies?: string[]): Promise<RiderData[]> {
         const instance = await this.createAxiosInstance(cookies);
-        const url = ZwiftRaceScraper.ZP_PROFILE_URL.replace("{zwift_id}", zwiftId);
-        const response = await instance.get(url);
-        const $ = cheerio.load(response.data);
-
-        const activities = new Set<string>();
-
-        $("a[href*='zwift.com/activity/']").each((_, el) => {
-            const href = $(el).attr("href");
-            const match = href?.match(/activity\/(\d+)/);
-            if (match) activities.add(match[1]);
-        });
-
-        return Array.from(activities);
+        const zwiftUrl = ZwiftRaceScraper.ZP_RESULTS_JSON_URL.replace("{race_id}", raceId);
+        const viewUrl = ZwiftRaceScraper.ZP_VIEW_JSON_URL.replace("{race_id}", raceId);
+        
+        console.log(`Fetching race results from JSON API: ${zwiftUrl}...`);
+        const zwiftResponse = await this.retryOnRateLimit(() => instance.get(zwiftUrl));
+        
+        if (!zwiftResponse.data || !zwiftResponse.data.data) {
+            console.warn('Invalid response format from zwift JSON API');
+            return [];
+        }
+        
+        // Also fetch the view JSON for additional data like category
+        console.log(`Fetching view data from JSON API: ${viewUrl}...`);
+        let viewData: any[] = [];
+        try {
+            const viewResponse = await this.retryOnRateLimit(() => instance.get(viewUrl));
+            viewData = viewResponse.data?.data || [];
+        } catch (viewError) {
+            console.warn('Could not fetch view data, continuing with basic data only');
+        }
+        
+        // Create a map of view data by zwid for quick lookup
+        const viewDataMap = new Map<string, any>();
+        for (const rider of viewData) {
+            if (rider.zwid) {
+                viewDataMap.set(String(rider.zwid), rider);
+            }
+        }
+        
+        const riders: RiderData[] = [];
+        const seenIds = new Set<string>();
+        
+        // Extract zwid and name from each rider entry, merge with view data
+        for (const rider of zwiftResponse.data.data) {
+            if (rider.zwid && !seenIds.has(rider.zwid)) {
+                const viewInfo = viewDataMap.get(String(rider.zwid));
+                const weight = viewInfo?.weight && Array.isArray(viewInfo.weight) 
+                    ? parseFloat(viewInfo.weight[0]) 
+                    : undefined;
+                const ftp = viewInfo?.ftp ? parseInt(viewInfo.ftp) : undefined;
+                
+                riders.push({
+                    zwiftId: rider.zwid,
+                    name: rider.name ? rider.name.trim() : `Rider ${rider.zwid}`,
+                    category: viewInfo?.category || undefined,
+                    weight: !isNaN(weight as any) ? weight : undefined,
+                    ftp: !isNaN(ftp as any) ? ftp : undefined,
+                    flag: viewInfo?.flag || undefined,
+                    age: viewInfo?.age || undefined
+                });
+                seenIds.add(rider.zwid);
+            }
+        }
+        
+        console.log(`Found ${riders.length} riders in race ${raceId}`);
+        return riders;
     }
 
-    /** Download a FIT file for an activity (public activities only) */
-    public async downloadFit(activityId: string, cookies?: string[]): Promise<ArrayBuffer | null> {
+    /** Fetch activity analysis data for a rider in a specific race */
+    public async getActivityAnalysis(zwiftId: string, raceId: string, cookies?: string[]): Promise<any> {
         const instance = await this.createAxiosInstance(cookies);
-        const url = ZwiftRaceScraper.ZWIFT_ACTIVITY_URL.replace("{activity_id}", activityId);
+        const url = ZwiftRaceScraper.ZP_ANALYSIS_URL
+            .replace("{zwift_id}", zwiftId)
+            .replace("{race_id}", raceId);
 
         try {
-            const response = await instance.get(url, {
-                responseType: "arraybuffer",
-                validateStatus: () => true
-            });
-
-            if (
-                response.status === 200 &&
-                String(response.headers["content-type"]).includes("application")
-            ) {
-                console.log(`Downloaded FIT file for activity ${activityId}`);
+            console.log(`Fetching activity analysis for rider ${zwiftId} in race ${raceId}...`);
+            const response = await this.retryOnRateLimit(() => instance.get(url));
+            
+            if (response.data) {
                 return response.data;
             }
-
-            console.warn(`Failed to download FIT for ${activityId} (status=${response.status})`);
+            
+            console.warn(`No data returned for rider ${zwiftId} in race ${raceId}`);
             return null;
-        } catch (err) {
-            console.error(`Error downloading activity ${activityId}:`, err);
+        } catch (error) {
+            console.error(`Error fetching activity analysis for rider ${zwiftId}:`, error);
             return null;
         }
     }
 
-    /** Main function: download all public FIT files for all riders in a race */
-    public async pullRaceFitFiles(raceId: string, cookies?: string[]): Promise<FitFileData[]> {
+    /** Main function: get activity analysis data for all riders in a race */
+    public async getRaceAnalysis(raceId: string, cookies?: string[]): Promise<any[]> {
         console.log(`Fetching riders for race ${raceId}...`);
         const riders = await this.getRidersInRace(raceId, cookies);
 
         console.log(`Found ${riders.length} riders.\n`);
 
-        const fitFiles: FitFileData[] = [];
+        const analysisData: any[] = [];
 
-        for (const rid of riders) {
-            console.log(`Processing rider ${rid}...`);
-            const activities = await this.getPublicActivities(rid, cookies);
+        for (const rider of riders) {
+            console.log(`Processing rider ${rider.name} (${rider.zwiftId})...`);
+            const analysis = await this.getActivityAnalysis(rider.zwiftId, raceId, cookies);
 
-            if (!activities.length) {
-                console.log(` No public activities for rider ${rid}.`);
-                continue;
-            }
-
-            console.log(` Found ${activities.length} public activities.`);
-
-            for (const act of activities) {
-                const data = await this.downloadFit(act, cookies);
-                if (data) {
-                    fitFiles.push({
-                        activityId: act,
-                        zwiftId: rid,
-                        data
-                    });
-                }
+            if (analysis) {
+                analysisData.push({
+                    ...analysis,
+                    ...rider,
+                });
+                console.log(`  ✓ Got analysis data for ${rider.name}`);
+            } else {
+                console.log(`  ✗ No analysis data for ${rider.name}`);
             }
         }
 
-        console.log(`\nTotal FIT files downloaded: ${fitFiles.length}`);
-        return fitFiles;
+        console.log(`\nTotal riders with analysis data: ${analysisData.length}`);
+        return analysisData;
     }
 }

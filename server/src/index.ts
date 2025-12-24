@@ -5,16 +5,23 @@ import { ZwiftRaceScraper } from './raceScraper.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+
 app.use(cors({
-    origin: true,
+    origin: 'https://orange-journey-5456xjpj6g7395p-5173.app.github.dev',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-Requested-With',
+        'Accept',
+        'Origin',
+        'x-zwift-cookies'
+    ],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-    exposedHeaders: ['Content-Disposition'],
-    preflightContinue: false,
-    optionsSuccessStatus: 204
 }));
+
 app.use(express.json());
+
 
 const scraper = new ZwiftRaceScraper();
 
@@ -26,6 +33,7 @@ app.get('/api/health', (req, res) => {
 // Login to ZwiftPower
 app.post('/api/login', async (req, res) => {
     try {
+        console.log("Received login request");
         const { username, password } = req.body;
         
         if (!username || !password) {
@@ -61,67 +69,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Get riders in a race
-app.get('/api/race/:raceId/riders', async (req, res) => {
-    try {
-        const { raceId } = req.params;
-        const cookies = req.headers['x-zwift-cookies'] 
-            ? JSON.parse(req.headers['x-zwift-cookies'] as string) 
-            : undefined;
-        const riders = await scraper.getRidersInRace(raceId, cookies);
-        res.json({ riders });
-    } catch (error) {
-        console.error('Error fetching riders:', error);
-        res.status(500).json({ 
-            error: 'Failed to fetch riders',
-            message: error instanceof Error ? error.message : 'Unknown error'
-        });
-    }
-});
-
-// Get public activities for a Zwift ID
-app.get('/api/rider/:zwiftId/activities', async (req, res) => {
-    try {
-        const { zwiftId } = req.params;
-        const cookies = req.headers['x-zwift-cookies'] 
-            ? JSON.parse(req.headers['x-zwift-cookies'] as string) 
-            : undefined;
-        const activities = await scraper.getPublicActivities(zwiftId, cookies);
-        res.json({ activities });
-    } catch (error) {
-        console.error('Error fetching activities:', error);
-        res.status(500).json({ 
-            error: 'Failed to fetch activities',
-            message: error instanceof Error ? error.message : 'Unknown error'
-        });
-    }
-});
-
-// Download FIT file for an activity
-app.get('/api/activity/:activityId/fit', async (req, res) => {
-    try {
-        const { activityId } = req.params;
-        const cookies = req.headers['x-zwift-cookies'] 
-            ? JSON.parse(req.headers['x-zwift-cookies'] as string) 
-            : undefined;
-        const data = await scraper.downloadFit(activityId, cookies);
-        
-        if (!data) {
-            return res.status(404).json({ error: 'FIT file not found or not accessible' });
-        }
-
-        res.setHeader('Content-Type', 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="activity_${activityId}.fit"`);
-        res.send(Buffer.from(data));
-    } catch (error) {
-        console.error('Error downloading FIT file:', error);
-        res.status(500).json({ 
-            error: 'Failed to download FIT file',
-            message: error instanceof Error ? error.message : 'Unknown error'
-        });
-    }
-});
-
 // Pull all FIT files for a race
 app.get('/api/race/:raceId/fit-files', async (req, res) => {
     try {
@@ -129,16 +76,9 @@ app.get('/api/race/:raceId/fit-files', async (req, res) => {
         const cookies = req.headers['x-zwift-cookies'] 
             ? JSON.parse(req.headers['x-zwift-cookies'] as string) 
             : undefined;
-        const fitFiles = await scraper.pullRaceFitFiles(raceId, cookies);
+        const activities = await scraper.getRaceAnalysis(raceId, cookies);
         
-        // Convert ArrayBuffers to Base64 for JSON transmission
-        const serializedFiles = fitFiles.map(file => ({
-            activityId: file.activityId,
-            zwiftId: file.zwiftId,
-            data: Buffer.from(file.data).toString('base64')
-        }));
-        
-        res.json({ fitFiles: serializedFiles, count: serializedFiles.length });
+        res.json({ activities: activities, count: activities.length });
     } catch (error) {
         console.error('Error pulling race FIT files:', error);
         res.status(500).json({ 
