@@ -97,159 +97,85 @@ export class ZwiftRaceScraper {
     }
 
     /**
-     * Set cookies from string array for authenticated requests
+     * Create an axios instance with optional cookies
      */
-    private async setCookiesFromStrings(cookieStrings: string[]): Promise<void> {
-        for (const cookieStr of cookieStrings) {
-            await this.cookieJar.setCookie(cookieStr, 'https://zwiftpower.com');
+    private async createAxiosInstance(cookies?: string[]): Promise<AxiosInstance> {
+        if (cookies && cookies.length > 0) {
+            const tempJar = new CookieJar();
+            const tempInstance = wrapper(axios.create({
+                jar: tempJar,
+                withCredentials: true,
+            }));
+            
+            for (const cookieStr of cookies) {
+                await tempJar.setCookie(cookieStr, 'https://zwiftpower.com');
+            }
+            
+            return tempInstance;
         }
+        return this.axiosInstance;
     }
 
     /** Fetch Zwift IDs of riders in a given ZwiftPower race */
     public async getRidersInRace(raceId: string, cookies?: string[]): Promise<string[]> {
-        // Clear and set cookies if provided
-        if (cookies && cookies.length > 0) {
-            // Create a new instance with the provided cookies
-            const tempJar = new CookieJar();
-            const tempInstance = wrapper(axios.create({
-                jar: tempJar,
-                withCredentials: true,
-            }));
-            
-            for (const cookieStr of cookies) {
-                await tempJar.setCookie(cookieStr, 'https://zwiftpower.com');
-            }
-            
-            const url = ZwiftRaceScraper.ZP_EVENT_URL.replace("{race_id}", raceId);
-            const response = await tempInstance.get(url);
-            const $ = cheerio.load(response.data);
+        const instance = await this.createAxiosInstance(cookies);
+        const url = ZwiftRaceScraper.ZP_EVENT_URL.replace("{race_id}", raceId);
+        const response = await instance.get(url);
+        const $ = cheerio.load(response.data);
 
-            const riders = new Set<string>();
+        const riders = new Set<string>();
 
-            console.log(`Parsing riders from race page ${url}...`);
+        console.log(`Parsing riders from race page ${url}...`);
 
-            $("a[href*='profile.php?z=']").each((_, el) => {
-                console.log('Found rider link:', $(el).attr("href"));
-                const href = $(el).attr("href");
-                const match = href?.match(/z=(\d+)/);
-                if (match) riders.add(match[1]);
-            });
+        $("a[href*='profile.php?z=']").each((_, el) => {
+            console.log('Found rider link:', $(el).attr("href"));
+            const href = $(el).attr("href");
+            const match = href?.match(/z=(\d+)/);
+            if (match) riders.add(match[1]);
+        });
 
-            return Array.from(riders);
-        } else {
-            // Use default instance without custom cookies
-            const url = ZwiftRaceScraper.ZP_EVENT_URL.replace("{race_id}", raceId);
-            const response = await this.axiosInstance.get(url);
-            const $ = cheerio.load(response.data);
-
-            const riders = new Set<string>();
-
-            console.log(`Parsing riders from race page ${url}...`);
-
-            $("a[href*='profile.php?z=']").each((_, el) => {
-                console.log('Found rider link:', $(el).attr("href"));
-                const href = $(el).attr("href");
-                const match = href?.match(/z=(\d+)/);
-                if (match) riders.add(match[1]);
-            });
-
-            return Array.from(riders);
-        }
+        return Array.from(riders);
     }
 
     /** Fetch public Zwift activity IDs from a ZwiftPower profile page */
     public async getPublicActivities(zwiftId: string, cookies?: string[]): Promise<string[]> {
-        // Clear and set cookies if provided
-        if (cookies && cookies.length > 0) {
-            const tempJar = new CookieJar();
-            const tempInstance = wrapper(axios.create({
-                jar: tempJar,
-                withCredentials: true,
-            }));
-            
-            for (const cookieStr of cookies) {
-                await tempJar.setCookie(cookieStr, 'https://zwiftpower.com');
-            }
-            
-            const url = ZwiftRaceScraper.ZP_PROFILE_URL.replace("{zwift_id}", zwiftId);
-            const response = await tempInstance.get(url);
-            const $ = cheerio.load(response.data);
+        const instance = await this.createAxiosInstance(cookies);
+        const url = ZwiftRaceScraper.ZP_PROFILE_URL.replace("{zwift_id}", zwiftId);
+        const response = await instance.get(url);
+        const $ = cheerio.load(response.data);
 
-            const activities = new Set<string>();
+        const activities = new Set<string>();
 
-            $("a[href*='zwift.com/activity/']").each((_, el) => {
-                const href = $(el).attr("href");
-                const match = href?.match(/activity\/(\d+)/);
-                if (match) activities.add(match[1]);
-            });
+        $("a[href*='zwift.com/activity/']").each((_, el) => {
+            const href = $(el).attr("href");
+            const match = href?.match(/activity\/(\d+)/);
+            if (match) activities.add(match[1]);
+        });
 
-            return Array.from(activities);
-        } else {
-            const url = ZwiftRaceScraper.ZP_PROFILE_URL.replace("{zwift_id}", zwiftId);
-            const response = await this.axiosInstance.get(url);
-            const $ = cheerio.load(response.data);
-
-            const activities = new Set<string>();
-
-            $("a[href*='zwift.com/activity/']").each((_, el) => {
-                const href = $(el).attr("href");
-                const match = href?.match(/activity\/(\d+)/);
-                if (match) activities.add(match[1]);
-            });
-
-            return Array.from(activities);
-        }
+        return Array.from(activities);
     }
 
     /** Download a FIT file for an activity (public activities only) */
     public async downloadFit(activityId: string, cookies?: string[]): Promise<ArrayBuffer | null> {
+        const instance = await this.createAxiosInstance(cookies);
         const url = ZwiftRaceScraper.ZWIFT_ACTIVITY_URL.replace("{activity_id}", activityId);
 
         try {
-            // Use custom cookies if provided
-            if (cookies && cookies.length > 0) {
-                const tempJar = new CookieJar();
-                const tempInstance = wrapper(axios.create({
-                    jar: tempJar,
-                    withCredentials: true,
-                }));
-                
-                for (const cookieStr of cookies) {
-                    await tempJar.setCookie(cookieStr, 'https://zwiftpower.com');
-                }
-                
-                const response = await tempInstance.get(url, {
-                    responseType: "arraybuffer",
-                    validateStatus: () => true
-                });
+            const response = await instance.get(url, {
+                responseType: "arraybuffer",
+                validateStatus: () => true
+            });
 
-                if (
-                    response.status === 200 &&
-                    String(response.headers["content-type"]).includes("application")
-                ) {
-                    console.log(`Downloaded FIT file for activity ${activityId}`);
-                    return response.data;
-                }
-
-                console.warn(`Failed to download FIT for ${activityId} (status=${response.status})`);
-                return null;
-            } else {
-                const response = await this.axiosInstance.get(url, {
-                    responseType: "arraybuffer",
-                    validateStatus: () => true
-                });
-
-                if (
-                    response.status === 200 &&
-                    String(response.headers["content-type"]).includes("application")
-                ) {
-                    console.log(`Downloaded FIT file for activity ${activityId}`);
-                    return response.data;
-                }
-
-                console.warn(`Failed to download FIT for ${activityId} (status=${response.status})`);
-                return null;
+            if (
+                response.status === 200 &&
+                String(response.headers["content-type"]).includes("application")
+            ) {
+                console.log(`Downloaded FIT file for activity ${activityId}`);
+                return response.data;
             }
+
+            console.warn(`Failed to download FIT for ${activityId} (status=${response.status})`);
+            return null;
         } catch (err) {
             console.error(`Error downloading activity ${activityId}:`, err);
             return null;
