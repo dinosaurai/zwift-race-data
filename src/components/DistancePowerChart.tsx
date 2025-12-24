@@ -3,12 +3,12 @@ import { useRaceData } from '../contexts/RaceDataContext';
 import './DistancePowerChart.css';
 
 const DistancePowerChart = () => {
-  const { competitors } = useRaceData();
+  const { data } = useRaceData();
 
   // Transform data for Recharts - combine all competitors' data points
   const chartData: { [key: number]: { distance: number; [key: string]: number } } = {};
   
-  competitors.forEach(competitor => {
+  data.forEach(competitor => {
     competitor.dataPoints.forEach(point => {
       if (!chartData[point.distance]) {
         chartData[point.distance] = { distance: point.distance };
@@ -17,7 +17,7 @@ const DistancePowerChart = () => {
     });
   });
 
-  const data = Object.values(chartData);
+  const chartValues = Object.values(chartData);
 
   const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c'];
 
@@ -30,7 +30,7 @@ const DistancePowerChart = () => {
       </p>
       <ResponsiveContainer width="100%" height={500}>
         <LineChart
-          data={data}
+          data={chartValues}
           margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
         >
           <CartesianGrid strokeDasharray="3 3" />
@@ -43,7 +43,7 @@ const DistancePowerChart = () => {
           />
           <Tooltip />
           <Legend />
-          {competitors.map((competitor, index) => (
+          {data.map((competitor, index) => (
             <Line
               key={competitor.id}
               type="monotone"

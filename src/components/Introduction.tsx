@@ -1,6 +1,25 @@
+import { useCallback, useState } from 'react';
 import './Introduction.css';
+import { useRaceData } from '../contexts/RaceDataContext';
+import { ZwiftRaceScraper } from '../data/raceScraper';
+
+const scraper = new ZwiftRaceScraper();
 
 const Introduction = () => {
+  const [raceId, setRaceId] = useState('');
+  const { setData } = useRaceData();
+
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRaceId(e.target.value);
+  };
+
+  const handleSubmit = useCallback(async () => {
+    const raceData = await scraper.pullRaceFitFiles(raceId);
+    console.log('Fetched race data:', raceData);
+    // setData(raceData);
+  }, [setData, raceId]);
+
   return (
     <section className="introduction">
       <h1>Zwift Race Data Viewer</h1>
@@ -11,6 +30,8 @@ const Introduction = () => {
         helping you identify key moments in the race, compare performance across competitors, and gain insights 
         into race dynamics.
       </p>
+      <input placeholder="Enter race ID" value={raceId} onChange={handleInputChange} />
+      <button onClick={handleSubmit}>Load Race</button>
     </section>
   );
 };
